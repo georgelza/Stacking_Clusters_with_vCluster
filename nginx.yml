@@ -1,0 +1,281 @@
+# Single-node nginx on tenant cluster vc-t1, namespaced to `nginx`.
+#
+#   vcluster connect vc-t1 -n tenant1
+#   kubectl apply -f nginx.yml
+#   kubectl -n nginx port-forward svc/nginx 8080:80
+#
+# ─────────────────────────────────────────────────────────────────────────────
+#  ⚠ nginx IS ALONE ON ITS CLUSTER — no upstream to redis or postgres
+# ─────────────────────────────────────────────────────────────────────────────
+#  Placement across the three tenants:
+#      vc-t1 → nginx      (this file)
+#      vc-t2 → redis      redis.yml
+#      vc-t3 → postgres   pg.yml
+#
+#  Those are three SEPARATE Kubernetes clusters. `redis.redis.svc.cluster.local`
+#  and `postgres.postgres.svc.cluster.local` are names in t2's and t3's DNS
+#  domains, not t1's. An earlier revision of this file proxied to both, which
+#  cannot work: nginx resolves a literal upstream hostname during startup and
+#  hard-exits with
+#
+#      nginx: [emerg] host not found in upstream "redis.redis.svc.cluster.local"
+#
+#  So this config is deliberately self-contained. To actually front redis or
+#  postgres you need one of:
+#    - put nginx on the same cluster as the backend, or
+#    - an ingress/controller that spans clusters, or
+#    - rewrite the upstreams to routable addresses (NodePort/LB IP, not .svc DNS)
+#      and add `resolver` so nginx doesn't need them at startup.
+#
+# Config lives in a ConfigMap so it is reviewable and reloadable, not baked into
+# an image layer.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nginx
+  labels:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/part-of: stacked
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nginx
+  namespace: nginx
+  labels:
+    app.kubernetes.io/name: nginx
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+  namespace: nginx
+  labels:
+    app.kubernetes.io/name: nginx
+data:
+  nginx.conf: |
+    user  nginx;
+    worker_processes  auto;
+    error_log  /var/log/nginx/error.log warn;
+    pid        /var/run/nginx.pid;
+
+    events {
+      worker_connections  1024;
+    }
+
+    http {
+      include       /etc/nginx/mime.types;
+      default_type  application/octet-stream;
+
+      log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" rt=$request_time urt=$upstream_response_time';
+      access_log  /var/log/nginx/access.log  main;
+
+      sendfile        on;
+      tcp_nopush      on;
+      tcp_nodelay     on;
+      server_tokens   off;
+      keepalive_timeout  65;
+      client_max_body_size  16m;
+
+      # When upstreams are added back (routable IPs, not .svc names), give nginx
+      # a resolver so a downstream DNS outage degrades to 502 instead of
+      # preventing startup.
+      # resolver 10.96.0.10 valid=10s ipv6=off;
+
+      server {
+        listen       80;
+        listen  [::]:80;
+        server_name  _;
+
+        location = /nginx-health {
+          access_log off;
+          add_header Content-Type text/plain always;
+          return 200 "nginx ok\n";
+        }
+
+        location = /cluster-info {
+          access_log off;
+          default_type application/json;
+          return 200 '{"tenant":"vc-t1","namespace":"nginx","role":"edge"}\n';
+        }
+
+        location / {
+          root   /usr/share/nginx/html;
+          index  index.html;
+          try_files $uri $uri/ =404;
+        }
+
+        location = /healthz {
+          access_log off;
+          return 200 "ok\n";
+        }
+      }
+
+      server {
+        listen      8080;
+        server_name _;
+        root        /usr/share/nginx/html;
+
+        location / {
+          try_files $uri $uri/ =404;
+        }
+      }
+    }
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nginx-html
+  namespace: nginx
+  labels:
+    app.kubernetes.io/name: nginx
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: nginx
+  labels:
+    app.kubernetes.io/name: nginx
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nginx
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nginx
+    spec:
+      serviceAccountName: nginx
+      securityContext:
+        fsGroup: 101 # nginx uid in the official image
+      initContainers:
+        - name: init-html
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              mkdir -p /usr/share/nginx/html
+              if [ ! -f /usr/share/nginx/html/index.html ]; then
+                printf '%s\n' \
+                  '<!doctype html><meta charset="utf-8"><title>stacked</title>' \
+                  '<h1>stacked lab</h1>' \
+                  '<p>nginx running in namespace <code>nginx</code> on tenant cluster <code>vc-t1</code>.</p>' \
+                  '<ul>' \
+                  '  <li><a href="/nginx-health">/nginx-health</a></li>' \
+                  '  <li><a href="/cluster-info">/cluster-info</a></li>' \
+                  '</ul>' \
+                  '<p>redis lives on <code>vc-t2</code> and postgres on <code>vc-t3</code> —' \
+                  ' separate clusters, not reachable as .svc DNS from here.</p>' \
+                  > /usr/share/nginx/html/index.html
+              fi
+              chown -R 101:101 /usr/share/nginx/html
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - name: http
+              containerPort: 80
+            - name: http-alt
+              containerPort: 8080
+          volumeMounts:
+            - name: conf
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: html
+              mountPath: /usr/share/nginx/html
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: run
+              mountPath: /var/run
+          livenessProbe:
+            httpGet:
+              path: /nginx-health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /nginx-health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE", "CHOWN", "SETGID", "SETUID"]
+          lifecycle:
+            preStop:
+              exec:
+                # Drain in-flight requests instead of dropping the connection.
+                command: ["sh", "-c", "sleep 5"]
+      volumes:
+        - name: conf
+          configMap:
+            name: nginx-conf
+        - name: html
+          persistentVolumeClaim:
+            claimName: nginx-html
+        # The image writes client temp bodies and proxy temp files here; an
+        # emptyDir keeps the container root filesystem untouched.
+        - name: cache
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: nginx
+  labels:
+    app.kubernetes.io/name: nginx
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nginx
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: http-alt
+      port: 8080
+      targetPort: http-alt

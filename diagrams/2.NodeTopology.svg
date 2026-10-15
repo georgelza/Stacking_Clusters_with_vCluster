@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" width="100%" height="100%" style="background:#0f172a; font-family: system-ui, -apple-system, sans-serif;">
+  <!-- Header -->
+  <text x="30" y="40" fill="#f8fafc" font-size="22" font-weight="bold">Node Topology &amp; Driver Models</text>
+  <text x="30" y="62" fill="#94a3b8" font-size="14">Comparing Dedicated Docker Nodes (vc-t1, vc-t3) vs. Host Node Inheritance (vc-t2)</text>
+
+  <!-- MODEL 1: Docker Driver -->
+  <g transform="translate(30, 90)">
+    <rect x="0" y="0" width="450" height="480" rx="12" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+    <text x="20" y="35" fill="#38bdf8" font-size="18" font-weight="bold">1. Docker Driver Model (vc-t1 &amp; vc-t3)</text>
+    <text x="20" y="55" fill="#94a3b8" font-size="12">Isolated node containers managed directly by vCluster CLI</text>
+
+    <!-- Host Docker Engine Box -->
+    <rect x="20" y="75" width="410" height="385" rx="8" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+    <text x="35" y="98" fill="#cbd5e1" font-size="13" font-weight="bold">Docker Engine Container Space</text>
+
+    <!-- vc-t3 Node Containers -->
+    <g transform="translate(35, 115)">
+      <!-- Control Plane Container -->
+      <rect x="0" y="0" width="380" height="55" rx="6" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1"/>
+      <text x="15" y="25" fill="#ffffff" font-size="13" font-weight="bold">vcluster.vc-t3 (Control Plane)</text>
+      <text x="15" y="42" fill="#93c5fd" font-size="11">Runs API Server, k3s/k8s control components</text>
+
+      <!-- Dedicated Worker 1 Container -->
+      <rect x="0" y="65" width="180" height="85" rx="6" fill="#172554" stroke="#2563eb" stroke-width="1"/>
+      <text x="10" y="85" fill="#ffffff" font-size="12" font-weight="bold">vcluster.node.vc-t3.t3-worker-1</text>
+      <text x="10" y="105" fill="#bfdbfe" font-size="10">Mount: ./data/tenant3/n1</text>
+      <text x="10" y="125" fill="#60a5fa" font-size="10">Role: Isolated Worker</text>
+
+      <!-- Dedicated Worker 2 Container -->
+      <rect x="200" y="65" width="180" height="85" rx="6" fill="#172554" stroke="#2563eb" stroke-width="1"/>
+      <text x="210" y="85" fill="#ffffff" font-size="12" font-weight="bold">vcluster.node.vc-t3.t3-worker-2</text>
+      <text x="210" y="105" fill="#f43f5e" font-size="10" font-weight="bold">Mount: ./data/tenant3/n2</text>
+      <text x="210" y="125" fill="#38bdf8" font-size="10">Runs: postgres Pod &amp; PVC</text>
+
+      <!-- Dedicated Worker 3 & 4 -->
+      <rect x="0" y="160" width="180" height="65" rx="6" fill="#172554" stroke="#2563eb" stroke-width="1"/>
+      <text x="10" y="180" fill="#ffffff" font-size="12" font-weight="bold">t3-worker-3</text>
+      <text x="10" y="200" fill="#bfdbfe" font-size="10">Mount: ./data/tenant3/n3</text>
+
+      <rect x="200" y="160" width="180" height="65" rx="6" fill="#172554" stroke="#2563eb" stroke-width="1"/>
+      <text x="210" y="180" fill="#ffffff" font-size="12" font-weight="bold">t3-worker-4</text>
+      <text x="210" y="200" fill="#bfdbfe" font-size="10">Mount: ./data/tenant3/n4</text>
+    </g>
+
+    <!-- Key Takeaway Box -->
+    <rect x="35" y="355" width="380" height="90" rx="6" fill="#0284c7" fill-opacity="0.15" stroke="#0284c7" stroke-width="1"/>
+    <text x="45" y="375" fill="#38bdf8" font-size="11" font-weight="bold">Key Characteristic:</text>
+    <text x="45" y="393" fill="#e0f2fe" font-size="11">• Owns physical Docker node containers.</text>
+    <text x="45" y="409" fill="#e0f2fe" font-size="11">• Visible in `vcluster list` and `docker ps`.</text>
+    <text x="45" y="425" fill="#e0f2fe" font-size="11">• Node storage bound via custom `localPathProvisioner.nodePath`.</text>
+  </g>
+
+  <!-- MODEL 2: Helm Driver -->
+  <g transform="translate(520, 90)">
+    <rect x="0" y="0" width="450" height="480" rx="12" fill="#1e293b" stroke="#d946ef" stroke-width="2"/>
+    <text x="20" y="35" fill="#d946ef" font-size="18" font-weight="bold">2. Helm Driver Model (vc-t2)</text>
+    <text x="20" y="55" fill="#94a3b8" font-size="12">Nested natively inside host vCluster namespace</text>
+
+    <!-- Host vCluster Boundary -->
+    <rect x="20" y="75" width="410" height="385" rx="8" fill="#311b92" fill-opacity="0.3" stroke="#6366f1" stroke-width="1"/>
+    <text x="35" y="98" fill="#a5b4fc" font-size="13" font-weight="bold">my-host vCluster (Host Cluster)</text>
+
+    <!-- Namespace tenant2 -->
+    <g transform="translate(35, 115)">
+      <rect x="0" y="0" width="380" height="225" rx="8" fill="#4a044e" fill-opacity="0.4" stroke="#c084fc" stroke-width="1"/>
+      <text x="15" y="25" fill="#f5d0fe" font-size="13" font-weight="bold">Namespace: tenant2 (on my-host)</text>
+
+      <!-- Control Plane Pod -->
+      <rect x="15" y="40" width="350" height="45" rx="6" fill="#701a75" stroke="#d946ef" stroke-width="1"/>
+      <text x="25" y="60" fill="#ffffff" font-size="12" font-weight="bold">Pod: vc-t2-0 (vCluster Control Plane)</text>
+      <text x="25" y="75" fill="#f5d0fe" font-size="10">Runs as regular Pod inside host vCluster</text>
+
+      <!-- Synced Pods running on Host Nodes -->
+      <rect x="15" y="95" width="350" height="55" rx="6" fill="#3b0764" stroke="#a21caf" stroke-width="1"/>
+      <text x="25" y="115" fill="#ffffff" font-size="12" font-weight="bold">Pod: redis-78dc58c96d-x-redis-x-vc-t2</text>
+      <text x="25" y="132" fill="#f0abfc" font-size="10">Executes directly on my-host's worker-1/2/3 nodes</text>
+
+      <rect x="15" y="160" width="350" height="50" rx="6" fill="#3b0764" stroke="#a21caf" stroke-width="1"/>
+      <text x="25" y="180" fill="#ffffff" font-size="12" font-weight="bold">Pod: coredns-x-kube-system-x-vc-t2</text>
+      <text x="25" y="195" fill="#f0abfc" font-size="10">Lazily materializes virtual nodes in vc-t2 when scheduled</text>
+    </g>
+
+    <!-- Key Takeaway Box -->
+    <rect x="35" y="355" width="380" height="90" rx="6" fill="#d946ef" fill-opacity="0.15" stroke="#d946ef" stroke-width="1"/>
+    <text x="45" y="375" fill="#f5d0fe" font-size="11" font-weight="bold">Key Characteristic:</text>
+    <text x="45" y="393" fill="#fdf4ff" font-size="11">• Zero dedicated node containers.</text>
+    <text x="45" y="409" fill="#fdf4ff" font-size="11">• Invisible in `vcluster list` (requires helm driver context).</text>
+    <text x="45" y="425" fill="#fdf4ff" font-size="11">• `sync.fromHost.nodes.enabled=true` projects host nodes.</text>
+  </g>
+</svg>

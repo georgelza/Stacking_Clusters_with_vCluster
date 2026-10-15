@@ -1,0 +1,53 @@
+# Topology for tenant cluster vc-t2 — "Kubernetes Native", inherits my-host's nodes.
+#
+#   vcluster connect my-host
+#   vcluster create vc-t2 -n tenant2 --driver helm -f t2.yml
+#
+# ─────────────────────────────────────────────────────────────────────────────
+#  WHY --driver helm AND NOT experimental.docker
+# ─────────────────────────────────────────────────────────────────────────────
+#  There are two ways a vCluster can get nodes, and they are mutually exclusive:
+#
+#   1. experimental.docker (vhost.yml, t3.yml) — vCluster runs its OWN node
+#      containers. `kubectl get nodes` inside shows vcluster-owned nodes.
+#
+#   2. --driver helm — the control plane installs as ordinary Pods INTO the
+#      parent cluster and runs workloads on the parent's real nodes. The nodes
+#      you see inside vc-t2 ARE my-host's nodes.
+#
+#  This file is pattern 2: vc-t2 has no node containers of its own, so
+#  `kubectl get nodes` in vc-t2 reports worker-1/2/3 from my-host.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+#  ⚠ VERSION NOTE — the old `sync.nodes` block is gone
+# ─────────────────────────────────────────────────────────────────────────────
+#  Earlier revisions of this file used:
+#
+#      sync:
+#        nodes:
+#          enabled: true
+#          syncAllNodes: true
+#
+#  That does NOT work on vCluster 0.37.x. The chart schema sets
+#  additionalProperties: false, so an unknown key is a hard startup failure, not
+#  a warning — the control plane crash-loops with:
+#
+#      sync and load vCluster config: error unmarshaling JSON:
+#      while decoding JSON: json: unknown field "nodes"
+#
+#  Node syncing still exists, but it moved under the host->vCluster direction,
+#  and `syncAllNodes` was dropped (all host nodes are synced when enabled).
+#  The block below is the 0.37.x equivalent.
+
+sync:
+  fromHost:
+    nodes:
+      # Project my-host's REAL node objects into vc-t2. When false, vCluster
+      # fabricates placeholder "Fake Kubernetes Image" nodes instead — which is
+      # the default, and is why a plain `vcluster create` shows no real capacity.
+      enabled: true
+
+      # Read-only by default. Turning this on lets anyone inside vc-t2 relabel
+      # or taint my-host's actual worker nodes, which is a real privilege
+      # escalation path out of the tenant. Left off deliberately.
+      syncBackChanges: false

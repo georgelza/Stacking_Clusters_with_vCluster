@@ -1,0 +1,57 @@
+# Topology for tenant cluster vc-t3 — Docker driver, 4 dedicated worker nodes.
+#
+#   vcluster connect my-host
+#   vcluster create vc-t3 -n tenant3 -f t3.yml
+#
+# Unlike vc-t1 (single control-plane node) and vc-t2 (runs on my-host's own
+# nodes), vc-t3 owns four real node containers. Each bind-mounts a host
+# directory so its state survives the container.
+
+experimental:
+  docker:
+    nodes:
+      - name: "t3-worker-1"
+        volumes:
+          - "./data/tenant3/n1:/data"
+      - name: "t3-worker-2"
+        volumes:
+          - "./data/tenant3/n2:/data"
+      - name: "t3-worker-3"
+        volumes:
+          - "./data/tenant3/n3:/data"
+      - name: "t3-worker-4"
+        volumes:
+          - "./data/tenant3/n4:/data"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  WHY THIS BLOCK IS HERE — putting PV data on the host filesystem
+# ─────────────────────────────────────────────────────────────────────────────
+#  The ./data/tenant3/nN bind mounts above land at /data inside each node
+#  container, but out of the box NOTHING writes there. The local-path
+#  provisioner creates its volume directories at:
+#
+#      /opt/local-path-provisioner/pvc-<uuid>_<ns>_<claim>
+#
+#  ...which sits on the node container's own overlay filesystem. That directory is
+#  inside Docker's storage on the macOS VM — it is NOT under ./data, and it is
+#  not deleted by `make down`. Verified on vc-t3 before this block existed:
+#
+#      docker exec vcluster.node.vc-t3.t3-worker-2 \
+#        find / -maxdepth 7 -type d -name 'pvc-*'
+#      -> /opt/local-path-provisioner/pvc-52129cd3-..._postgres_postgres-data
+#
+#  `nodePath` redirects that base directory onto the bind mount, so a volume
+#  claimed by t3-worker-2 becomes visible on the host at:
+#
+#      ./data/tenant3/n2/local-path-provisioner/pvc-<uuid>_<ns>_<claim>
+#
+#  Consequences worth knowing:
+#    - `make down` (which rm -rf's ./data/tenant3) now really does discard the
+#      Postgres data. Before, the data survived teardown in Docker's layers.
+#    - The path is per-node, so a PVC pinned to t3-worker-2 is only ever a
+#      subdirectory of ./data/tenant3/n2 — do not hardcode n1 in any script.
+#    - /data is a virtiofs mount on macOS Docker Desktop, so this is a
+#      convenience for inspection, not a supported production storage backend.
+deploy:
+  localPathProvisioner:
+    nodePath: /data/local-path-provisioner

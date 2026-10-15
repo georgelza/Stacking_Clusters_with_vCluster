@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 780" width="100%" height="100%" style="background:#0f172a; font-family: system-ui, -apple-system, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="host-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="docker-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="myhost-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#311b92"/>
+    </linearGradient>
+    <linearGradient id="t1-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#022c22"/>
+    </linearGradient>
+    <linearGradient id="t2-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#701a75"/>
+      <stop offset="100%" stop-color="#4a044e"/>
+    </linearGradient>
+    <linearGradient id="t3-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#172554"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Canvas / Host Engine -->
+  <rect x="20" y="20" width="960" height="740" rx="16" fill="url(#host-grad)" stroke="#334155" stroke-width="2"/>
+  <text x="45" y="55" fill="#f8fafc" font-size="20" font-weight="bold">Host System (Docker Engine / macOS virtiofs)</text>
+  
+  <!-- Persistent Storage Bar -->
+  <rect x="45" y="75" width="910" height="40" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1" stroke-dasharray="4"/>
+  <text x="60" y="100" fill="#94a3b8" font-size="13" font-weight="600">Host Filesystem Bind Mounts:</text>
+  <text x="240" y="100" fill="#38bdf8" font-size="13" font-mono="true">./data/cluster/n1..3</text>
+  <text x="420" y="100" fill="#64748b" font-size="13">|</text>
+  <text x="440" y="100" fill="#f43f5e" font-size="13" font-mono="true">./data/tenant3/n1..4/local-path-provisioner/</text>
+
+  <!-- Docker Network Boundary -->
+  <rect x="45" y="130" width="910" height="610" rx="12" fill="none" stroke="#0284c7" stroke-width="2" stroke-dasharray="6,6"/>
+  <rect x="55" y="140" width="220" height="26" rx="6" fill="url(#docker-grad)"/>
+  <text x="65" y="157" fill="#ffffff" font-size="12" font-weight="bold">Docker Bridge Networks</text>
+
+  <!-- my-host vCluster (Host Cluster) -->
+  <rect x="65" y="180" width="870" height="540" rx="12" fill="url(#myhost-grad)" stroke="#6366f1" stroke-width="2"/>
+  <text x="85" y="210" fill="#a5b4fc" font-size="18" font-weight="bold">Host vCluster: my-host</text>
+  <text x="290" y="210" fill="#818cf8" font-size="13">(Driver: Docker | Config: vhost.yml | Nodes: my-host, worker-1, worker-2, worker-3)</text>
+
+  <!-- my-host Worker Nodes Area -->
+  <rect x="85" y="230" width="830" height="70" rx="8" fill="#0f172a" fill-opacity="0.6" stroke="#4338ca" stroke-width="1"/>
+  <text x="100" y="250" fill="#c7d2fe" font-size="12" font-weight="bold">my-host Nodes:</text>
+  <rect x="190" y="240" width="120" height="40" rx="6" fill="#312e81" stroke="#6366f1" stroke-width="1"/>
+  <text x="220" y="265" fill="#ffffff" font-size="12">my-host (CP)</text>
+  
+  <rect x="320" y="240" width="120" height="40" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+  <text x="350" y="265" fill="#e0e7ff" font-size="12">worker-1</text>
+  
+  <rect x="450" y="240" width="120" height="40" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+  <text x="480" y="265" fill="#e0e7ff" font-size="12">worker-2</text>
+  
+  <rect x="580" y="240" width="120" height="40" rx="6" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+  <text x="610" y="265" fill="#e0e7ff" font-size="12">worker-3</text>
+
+  <!-- TENANT CLUSTERS -->
+
+  <!-- Tenant 1 -->
+  <g transform="translate(85, 320)">
+    <rect x="0" y="0" width="260" height="380" rx="10" fill="url(#t1-grad)" stroke="#10b981" stroke-width="2"/>
+    <text x="15" y="30" fill="#a7f3d0" font-size="16" font-weight="bold">Tenant 1: vc-t1</text>
+    <text x="15" y="48" fill="#34d399" font-size="11">NS: tenant1 | Driver: Docker</text>
+    <text x="15" y="63" fill="#6ee7b7" font-size="11">Nodes: 1 Control-Plane (No workers)</text>
+    
+    <rect x="15" y="80" width="230" height="280" rx="8" fill="#022c22" stroke="#059669" stroke-width="1"/>
+    <text x="25" y="105" fill="#a7f3d0" font-size="13" font-weight="bold">Namespace: nginx</text>
+
+    <!-- App Box -->
+    <rect x="25" y="120" width="210" height="150" rx="6" fill="#064e3b" stroke="#10b981" stroke-width="1"/>
+    <text x="35" y="145" fill="#ffffff" font-size="14" font-weight="bold">Deployment: nginx</text>
+    <text x="35" y="165" fill="#a7f3d0" font-size="11">Pod: nginx-xxxxx (1/1)</text>
+    <text x="35" y="185" fill="#6ee7b7" font-size="11">Service: ClusterIP (Port 80/8080)</text>
+    <text x="35" y="205" fill="#34d399" font-size="11">PVC: nginx-html (1Gi)</text>
+    <rect x="35" y="220" width="190" height="35" rx="4" fill="#022c22"/>
+    <text x="43" y="242" fill="#facc15" font-size="10" font-mono="true">Isolated (No Upstreams)</text>
+
+    <text x="25" y="295" fill="#94a3b8" font-size="10">CLI Port Forward:</text>
+    <text x="25" y="310" fill="#38bdf8" font-size="10" font-mono="true">localhost:8080 -> 80</text>
+  </g>
+
+  <!-- Tenant 2 -->
+  <g transform="translate(370, 320)">
+    <rect x="0" y="0" width="260" height="380" rx="10" fill="url(#t2-grad)" stroke="#d946ef" stroke-width="2"/>
+    <text x="15" y="30" fill="#f5d0fe" font-size="16" font-weight="bold">Tenant 2: vc-t2</text>
+    <text x="15" y="48" fill="#e879f9" font-size="11">NS: tenant2 | Driver: HELM</text>
+    <text x="15" y="63" fill="#f0abfc" font-size="11">Nodes: Borrows my-host's workers</text>
+
+    <!-- Sync Indicator -->
+    <rect x="15" y="75" width="230" height="24" rx="4" fill="#4a044e" stroke="#c084fc" stroke-width="1" stroke-dasharray="3"/>
+    <text x="22" y="91" fill="#f5d0fe" font-size="10" font-mono="true">sync.fromHost.nodes.enabled</text>
+
+    <rect x="15" y="108" width="230" height="252" rx="8" fill="#3b0764" stroke="#a21caf" stroke-width="1"/>
+    <text x="25" y="130" fill="#f5d0fe" font-size="13" font-weight="bold">Namespace: redis</text>
+
+    <!-- App Box -->
+    <rect x="25" y="145" width="210" height="150" rx="6" fill="#701a75" stroke="#d946ef" stroke-width="1"/>
+    <text x="35" y="170" fill="#ffffff" font-size="14" font-weight="bold">Deployment: redis</text>
+    <text x="35" y="190" fill="#f5d0fe" font-size="11">Pod: redis-xxxxx (1/1)</text>
+    <text x="35" y="210" fill="#f0abfc" font-size="11">Service: redis.redis.svc...:6379</text>
+    <text x="35" y="230" fill="#e879f9" font-size="11">PVC: redis-data (2Gi)</text>
+    <text x="35" y="250" fill="#c084fc" font-size="11">Auth: stacked_local_dev</text>
+
+    <text x="25" y="320" fill="#f43f5e" font-size="10">⚠ Invisible in plain 'vcluster list'</text>
+    <text x="25" y="335" fill="#f43f5e" font-size="10">Must connect via host context</text>
+  </g>
+
+  <!-- Tenant 3 -->
+  <g transform="translate(655, 320)">
+    <rect x="0" y="0" width="260" height="380" rx="10" fill="url(#t3-grad)" stroke="#3b82f6" stroke-width="2"/>
+    <text x="15" y="30" fill="#bfdbfe" font-size="16" font-weight="bold">Tenant 3: vc-t3</text>
+    <text x="15" y="48" fill="#60a5fa" font-size="11">NS: tenant3 | Driver: Docker</text>
+    <text x="15" y="63" fill="#93c5fd" font-size="11">Nodes: 4 Dedicated (t3-worker-1..4)</text>
+
+    <rect x="15" y="80" width="230" height="280" rx="8" fill="#172554" stroke="#1d4ed8" stroke-width="1"/>
+    <text x="25" y="105" fill="#bfdbfe" font-size="13" font-weight="bold">Namespace: postgres</text>
+
+    <!-- App Box -->
+    <rect x="25" y="120" width="210" height="150" rx="6" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="35" y="145" fill="#ffffff" font-size="14" font-weight="bold">Deployment: postgres 16</text>
+    <text x="35" y="165" fill="#bfdbfe" font-size="11">Pod: postgres-xxxxx on t3-worker-2</text>
+    <text x="35" y="185" fill="#93c5fd" font-size="11">Service: postgres (5432)</text>
+    <text x="35" y="205" fill="#60a5fa" font-size="11">PVC: postgres-data (10Gi)</text>
+    
+    <!-- Storage Path Details -->
+    <rect x="35" y="215" width="190" height="45" rx="4" fill="#0f172a" stroke="#f43f5e" stroke-width="1"/>
+    <text x="40" y="230" fill="#f43f5e" font-size="9" font-weight="bold">Host Volume Persistence:</text>
+    <text x="40" y="245" fill="#f8fafc" font-size="8" font-mono="true">./data/tenant3/n2/local-path-...</text>
+
+    <text x="25" y="295" fill="#bfdbfe" font-size="10">Database: stacked</text>
+    <text x="25" y="310" fill="#bfdbfe" font-size="10">User: stacked / stacked_local_dev</text>
+  </g>
+</svg>

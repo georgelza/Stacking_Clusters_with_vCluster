@@ -1,0 +1,232 @@
+# Single-node PostgreSQL 16 on the host vCluster, namespaced to `postgres`.
+#
+#   kubectl apply -f pg.yml
+#   kubectl -n postgres exec deploy/postgres -- psql -U stacked -d stacked
+#
+# Not a HA cluster: one primary on one RWO PVC. Fine for tenants that only need a
+# scratch/OLTP-ish database in the lab.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: stacked
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres
+  namespace: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-auth
+  namespace: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+type: Opaque
+stringData:
+  POSTGRES_USER: stacked
+  POSTGRES_PASSWORD: stacked_local_dev
+  POSTGRES_DB: stacked
+  # Consumers reference this key to build a connection string.
+  DATABASE_URL: postgres://stacked:stacked_local_dev@postgres.postgres.svc.cluster.local:5432/stacked?sslmode=disable
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-conf
+  namespace: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+data:
+  postgresql.conf: |
+    listen_addresses = '*'
+    max_connections = 200
+    shared_buffers = 256MB
+    effective_cache_size = 768MB
+    work_mem = 8MB
+    maintenance_work_mem = 128MB
+    wal_level = replica
+    max_wal_size = 2GB
+    min_wal_size = 128MB
+    checkpoint_completion_target = 0.9
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    log_destination = 'stderr'
+    logging_collector = off
+    log_min_duration_statement = 500
+    log_checkpoints = on
+    log_lock_waits = on
+    log_min_error_statement = error
+    track_io_timing = on
+    timezone = 'UTC'
+    datestyle = 'iso, mdy'
+  pg_hba.conf: |
+    local   all             all                                     trust
+    host    all             all             127.0.0.1/32            trust
+    host    all             all             ::1/128                 trust
+    host    all             all             0.0.0.0/0               scram-sha-256
+    host    all             all             ::/0                    scram-sha-256
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+    spec:
+      serviceAccountName: postgres
+      securityContext:
+        fsGroup: 999 # postgres uid in the official image
+      initContainers:
+        # The mounted root is owned by root, so hand PGDATA to the postgres user
+        # before the server tries to initdb into it.
+        - name: init-pgdata
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - mkdir -p /var/lib/postgresql/data/pgdata && chown -R 999:999 /var/lib/postgresql/data
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-auth
+                  key: POSTGRES_DB
+            - name: POSTGRES_INITDB_ARGS
+              value: "--auth-host=scram-sha-256 --auth-local=trust"
+          ports:
+            - name: postgres
+              containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: conf
+              mountPath: /etc/postgresql/conf.d:ro
+          # Startup can run initdb for a while on first boot — keep the probes
+          # patient so a cold start is not mistaken for a crash.
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-U", "stacked", "-d", "stacked"]
+            periodSeconds: 5
+            failureThreshold: 30 # ~2.5 minutes
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "stacked", "-d", "stacked"]
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "stacked", "-d", "stacked"]
+            periodSeconds: 5
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+        - name: conf
+          configMap:
+            name: postgres-conf
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+
+---
+# Headless service: gives the pod a stable DNS name and lets the (future) replica
+# set resolve peers via SRV records without going through the ClusterIP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

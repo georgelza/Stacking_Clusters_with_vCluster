@@ -1,0 +1,31 @@
+# vCluster topology for the local lab.
+#
+# One vCluster, three node containers: a control plane plus three workers.
+# Each worker bind-mounts ./data/cluster/n<N> -> /data, which is where the
+# node's own state lands (this is what `make k8s-down` deletes).
+#
+#
+#   vcluster create my-host -f vhost.yml
+#   vcluster delete my-host
+#
+# Note: the control plane is created by `vcluster create` itself, before this
+# file is read — it is not listed here.
+
+experimental:
+  docker:
+    nodes:
+    - name: "worker-1"
+      volumes:
+        - "./data/cluster/n1:/data"
+      env:
+        - "NODE_ROLE=worker"
+    - name: "worker-2"
+      volumes:
+        - "./data/cluster/n2:/data"
+      env:
+        - "NODE_ROLE=worker"
+    - name: "worker-3"
+      volumes:
+        - "./data/cluster/n3:/data"
+      env:
+        - "NODE_ROLE=worker"
