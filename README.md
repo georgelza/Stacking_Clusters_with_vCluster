@@ -662,6 +662,10 @@ du -sh data/tenant3/n2/local-path-provisioner/*/
  46M	data/tenant3/n2/local-path-provisioner/pvc-f6ab58e2-758d-401c-b1c2-56aba66a4a3b_postgres_postgres-data/
 ```
 
+### All Docker Containers
+
+![All running containers](diagrams/AllContainers.png)
+
 ### Teardown
 
 ```bash
